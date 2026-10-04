@@ -254,12 +254,18 @@ button{font-family:inherit}
     </div>
     <div class="fld" style="border-top:1px solid #5c4a72;margin-top:12px;padding-top:12px">
       <span>&#128225; रिमोट कंट्रोल — दूसरे फोन (iPhone) से</span>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
-        <button id="remoteHost" class="seg">&#128225; होस्ट करो</button>
-        <b id="remoteCode" style="font-size:5.4vmin;color:#ce93d8"></b>
+      <div class="fld"><span>Device ka naam</span>
+        <input id="remoteDevice" maxlength="24" placeholder="My Android" style="width:100%">
       </div>
+      <div class="fld"><span>Owner username</span>
+        <input id="remoteOwner" maxlength="24" placeholder="himanshu" style="width:100%">
+      </div>
+      <div style="margin-top:10px">
+        <button id="remoteHost" class="seg" style="font-size:4.4vmin;padding:10px 18px">&#128225; होस्ट करो — नया कोड बनाओ</button>
+      </div>
+      <div id="remoteCodeBig" style="font-size:11vmin;font-weight:900;color:#ce93d8;letter-spacing:6px;text-align:center;margin:10px 0;min-height:12vmin"></div>
       <div id="remoteStatus" style="font-size:3.6vmin;color:var(--dim);margin-top:6px"></div>
-      <div style="font-size:3.2vmin;color:var(--dim)">iPhone पर ludo-admin.html खोलो और यही 4-अंक का कोड डालो</div>
+      <div style="font-size:3.2vmin;color:var(--dim)">iPhone par ludo-admin.html kholo, username + yahi code dalo. Har host par naya code, sheet me entry banegi.</div>
     </div>
     <div class="awarn">बंद रखने पर पासा 100% निष्पक्ष &mdash; किसी को पता नहीं चलेगा</div>
   </div>
@@ -828,6 +834,10 @@ function showModeFlds(){
 }
 function openAdmin(){
   syncDraft();refreshAdminUI();
+  try{
+    const d=localStorage.getItem("ludo_remote_dev");if(d)$("remoteDevice").value=d;
+    const o=localStorage.getItem("ludo_remote_owner");if(o)$("remoteOwner").value=o;
+  }catch(e){}
   $("adminModal").classList.remove("hidden");
   sndTap();
 }
@@ -852,39 +862,76 @@ $("adminReset").onclick=()=>{
 $("remoteHost").onclick=()=>{sndTap();remoteHost();};
 
 /* ---------------- remote control: game = HOST, iPhone = controller ----------------
-   Needs internet on BOTH phones (PeerJS signaling). Local game works offline. */
-const Remote={peer:null,conn:null,code:null};
+   Sheet-backed pairing: every Host click -> 6-char code -> saved to Google Sheet
+   (via Form) with device name. Admin connects with code + owner username. */
+const SHEET_FORM_URL="__SHEET_FORM_URL__";
+const SHEET_E_CODE="__SHEET_E_CODE__";
+const SHEET_E_DEV="__SHEET_E_DEV__";
+const SHEET_E_OWNER="__SHEET_E_OWNER__";
+const Remote={peer:null,conn:null,code:null,owner:"himanshu",device:"My Android"};
 function remoteSetStatus(t){const el=$("remoteStatus");if(el)el.textContent=t;}
+function genCode(){
+  const ch="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let c="";for(let i=0;i<6;i++)c+=ch[Math.floor(Math.random()*ch.length)];
+  return c;
+}
+function sheetLog(code,dev,owner){
+  if(!SHEET_FORM_URL||SHEET_FORM_URL.indexOf("__")===0)return;
+  try{
+    const fd=new FormData();
+    fd.append(SHEET_E_CODE,code);fd.append(SHEET_E_DEV,dev);fd.append(SHEET_E_OWNER,owner);
+    fetch(SHEET_FORM_URL,{method:"POST",mode:"no-cors",body:fd}).catch(()=>{});
+  }catch(e){}
+}
 function remoteHost(){
-  if(typeof Peer==="undefined"){remoteSetStatus("नेट/लाइब्रेरी नहीं — रिमोट बंद");return;}
-  if(Remote.peer){try{Remote.peer.destroy();}catch(e){}}
-  const code=String(Math.floor(1000+Math.random()*9000));
+  const dev=(($("remoteDevice").value||"").trim()||"My Android").slice(0,24);
+  const owner=(($("remoteOwner").value||"").trim()||"himanshu").slice(0,24);
+  try{localStorage.setItem("ludo_remote_dev",dev);}catch(e){}
+  try{localStorage.setItem("ludo_remote_owner",owner);}catch(e){}
+  Remote.device=dev;Remote.owner=owner;
+  if(Remote.peer){try{Remote.peer.destroy();}catch(e){} Remote.peer=null;Remote.conn=null;}
+  const code=genCode();
   Remote.code=code;
-  const rc=$("remoteCode");if(rc)rc.textContent="कोड: "+code;
-  remoteSetStatus("तैयार हो रहा…");
+  $("remoteCodeBig").textContent=code;
+  remoteSetStatus("Sheet me save ho raha…");
+  sheetLog(code,dev,owner);
+  if(typeof Peer==="undefined"){remoteSetStatus("Net nahi — code "+code+" phir bhi dikh raha hai");return;}
   try{
     Remote.peer=new Peer("himludo-g-"+code);
-    Remote.peer.on("open",()=>remoteSetStatus("तैयार — iPhone पर कोड "+code+" डालो"));
+    Remote.peer.on("open",()=>remoteSetStatus("✅ Taiyar — iPhone par username + code "+code+" dalo (sheet me entry ho gayi)"));
     Remote.peer.on("connection",c=>{
-      Remote.conn=c;
-      remoteSetStatus("✅ कंट्रोलर जुड़ा — iPhone से चलाओ");
-      setTurnUI();sndTap();
+      c.on("open",()=>{ c.send({t:"whoareyou"}); });
       c.on("data",d=>{
-        if(!d||d.t!=="rig"||!d.cfg)return;
-        const k=d.cfg;
-        Admin.enabled=!!k.enabled;
-        Admin.target=k.target||"blue";
-        Admin.mode=k.mode||"fixed";
-        Admin.fixedNum=k.fixedNum||6;
-        Admin.pattern=(k.pattern&&k.pattern.length)?k.pattern:[6];
-        Admin.everyN=k.everyN||3;
-        Admin.patternIdx=0;Admin.rollCount=0;
-        adminSave();setTurnUI();sndTap();
+        if(!d||!d.t)return;
+        if(d.t==="auth"){
+          if((d.user||"").trim()===Remote.owner){
+            Remote.conn=c;
+            c.send({t:"auth-ok",device:Remote.device});
+            remoteSetStatus("✅ Controller juda ("+Remote.device+") — iPhone se chalao");
+            setTurnUI();sndTap();
+          }else{
+            c.send({t:"auth-no"});
+            remoteSetStatus("⚠️ Galat username se connect try hua");
+            setTimeout(()=>{try{c.close();}catch(e){}},600);
+          }
+          return;
+        }
+        if(d.t==="rig"&&d.cfg&&(c===Remote.conn)){
+          const k=d.cfg;
+          Admin.enabled=!!k.enabled;
+          Admin.target=k.target||"blue";
+          Admin.mode=k.mode||"fixed";
+          Admin.fixedNum=k.fixedNum||6;
+          Admin.pattern=(k.pattern&&k.pattern.length)?k.pattern:[6];
+          Admin.everyN=k.everyN||3;
+          Admin.patternIdx=0;Admin.rollCount=0;
+          adminSave();setTurnUI();sndTap();
+        }
       });
-      c.on("close",()=>{Remote.conn=null;remoteSetStatus("कंट्रोलर हटा");setTurnUI();});
+      c.on("close",()=>{if(Remote.conn===c){Remote.conn=null;remoteSetStatus("Controller hata — code "+Remote.code+" ab bhi valid hai");setTurnUI();}});
     });
-    Remote.peer.on("error",e=>{remoteSetStatus("एरर: "+((e&&e.type)||"नेटवर्क"));});
-  }catch(e){remoteSetStatus("होस्ट नहीं बना");}
+    Remote.peer.on("error",e=>{remoteSetStatus("Error: "+((e&&e.type)||"network")+" — code "+code);});
+  }catch(e){remoteSetStatus("Host nahi bana — code "+code);}
 }
 
 /* ---------------- init ---------------- */
