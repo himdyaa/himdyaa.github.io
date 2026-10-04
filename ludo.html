@@ -252,10 +252,20 @@ button{font-family:inherit}
       <button id="adminSave">&#10003; सेव करो</button>
       <button id="adminReset">&#8635; रीसेट</button>
     </div>
+    <div class="fld" style="border-top:1px solid #5c4a72;margin-top:12px;padding-top:12px">
+      <span>&#128225; रिमोट कंट्रोल — दूसरे फोन (iPhone) से</span>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <button id="remoteHost" class="seg">&#128225; होस्ट करो</button>
+        <b id="remoteCode" style="font-size:5.4vmin;color:#ce93d8"></b>
+      </div>
+      <div id="remoteStatus" style="font-size:3.6vmin;color:var(--dim);margin-top:6px"></div>
+      <div style="font-size:3.2vmin;color:var(--dim)">iPhone पर ludo-admin.html खोलो और यही 4-अंक का कोड डालो</div>
+    </div>
     <div class="awarn">बंद रखने पर पासा 100% निष्पक्ष &mdash; किसी को पता नहीं चलेगा</div>
   </div>
 </div>
 
+<script src="peerjs.min.js"></script>
 <script>
 "use strict";
 
@@ -304,16 +314,18 @@ function adminReset(){Admin.enabled=false;Admin.target="blue";Admin.mode="fixed"
   try{localStorage.removeItem(ADMIN_KEY);}catch(e){}}
 adminLoad();
 
-/* dice with admin rigging checked FIRST; OFF => pure random */
-function getDiceRoll(color){
+/* dice with admin rigging checked FIRST; OFF => pure random.
+   fixed/pattern: ONLY a long-press (isLong) rigs - short taps stay random (discreet).
+   everyN: automatic on every roll. AI rolls are never rigged (isLong undefined). */
+function getDiceRoll(color,isLong){
   if(Admin.enabled&&color===Admin.target){
-    if(Admin.mode==="fixed")return Admin.fixedNum;
-    if(Admin.mode==="pattern"){
-      const p=Admin.pattern.length?Admin.pattern:[6];
-      const v=p[Admin.patternIdx%p.length]; Admin.patternIdx++; return v;}
     if(Admin.mode==="everyN"){
       if(Admin.rollCount>=Admin.everyN){Admin.rollCount=0;return 6;}
       Admin.rollCount++; return 1+Math.floor(Math.random()*6);}
+    if(isLong){
+      if(Admin.mode==="fixed")return Admin.fixedNum;
+      const p=Admin.pattern.length?Admin.pattern:[6];
+      const v=p[Admin.patternIdx%p.length]; Admin.patternIdx++; return v;}
   }
   return 1+Math.floor(Math.random()*6);
 }
@@ -472,7 +484,10 @@ function setTurnUI(){
     (p.isAI?"AI "+COLORS[p.color].name+" की चाल":"तुम्हारी चाल ("+COLORS[p.color].name+")");
   $("dice").classList.toggle("dim",!( !p.isAI&&!G.rolling&&!G.awaitingMove&&!G.busy&&!G.over));
   /* lucky clover when rigging is active for the current roller */
-  $("lucky").style.display=(Admin.enabled&&p.color===Admin.target)?"block":"none";
+  const rigOn=Admin.enabled&&p.color===Admin.target;
+  const remOn=Remote.conn&&Remote.conn.open;
+  $("lucky").style.display=(rigOn||remOn)?"block":"none";
+  $("lucky").textContent=remOn?"📡🍀":(rigOn?"🍀":"");
 }
 function msg(t){$("msg").innerHTML=t;}
 
@@ -522,16 +537,30 @@ function drawDice(v){
   for(let k=0;k<9;k++){const s=document.createElement("div");
     s.className="pip"+(P[v].includes(k)?" on":"");d.appendChild(s);}
 }
-$("dice").onclick=()=>{ /* bound once; init re-binds safely */
+/* tap = normal roll; LONG-PRESS (>=700ms) = rigged roll (discreet trigger) */
+let pressTimer=null,longFired=false;
+function diceReady(){
   const p=cur();
-  if(!p||p.isAI||G.rolling||G.awaitingMove||G.busy||G.over)return;
-  doRoll();
-};
-function doRoll(){
+  return p&&!p.isAI&&!G.rolling&&!G.awaitingMove&&!G.busy&&!G.over;
+}
+(function(){
+  const d=$("dice");
+  d.addEventListener("pointerdown",()=>{
+    if(!diceReady())return;
+    longFired=false;
+    pressTimer=setTimeout(()=>{longFired=true;pressTimer=null;doRoll(true);},700);
+  });
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=>
+    d.addEventListener(ev,()=>{
+      if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+      if(ev==="pointerup"&&!longFired&&diceReady())doRoll(false);
+    }));
+})();
+function doRoll(isLong){
   if(G.rolling||G.over)return;
   G.rolling=true;setTurnUI();
   const p=cur();
-  const val=getDiceRoll(p.color);
+  const val=getDiceRoll(p.color,isLong);
   $("dice").classList.add("rolling");sndDice();
   let ticks=0;
   const iv=setInterval(()=>{
@@ -820,6 +849,43 @@ $("adminSave").onclick=()=>{
 $("adminReset").onclick=()=>{
   adminReset();syncDraft();refreshAdminUI();setTurnUI();sndBad();
 };
+$("remoteHost").onclick=()=>{sndTap();remoteHost();};
+
+/* ---------------- remote control: game = HOST, iPhone = controller ----------------
+   Needs internet on BOTH phones (PeerJS signaling). Local game works offline. */
+const Remote={peer:null,conn:null,code:null};
+function remoteSetStatus(t){const el=$("remoteStatus");if(el)el.textContent=t;}
+function remoteHost(){
+  if(typeof Peer==="undefined"){remoteSetStatus("नेट/लाइब्रेरी नहीं — रिमोट बंद");return;}
+  if(Remote.peer){try{Remote.peer.destroy();}catch(e){}}
+  const code=String(Math.floor(1000+Math.random()*9000));
+  Remote.code=code;
+  const rc=$("remoteCode");if(rc)rc.textContent="कोड: "+code;
+  remoteSetStatus("तैयार हो रहा…");
+  try{
+    Remote.peer=new Peer("himludo-g-"+code);
+    Remote.peer.on("open",()=>remoteSetStatus("तैयार — iPhone पर कोड "+code+" डालो"));
+    Remote.peer.on("connection",c=>{
+      Remote.conn=c;
+      remoteSetStatus("✅ कंट्रोलर जुड़ा — iPhone से चलाओ");
+      setTurnUI();sndTap();
+      c.on("data",d=>{
+        if(!d||d.t!=="rig"||!d.cfg)return;
+        const k=d.cfg;
+        Admin.enabled=!!k.enabled;
+        Admin.target=k.target||"blue";
+        Admin.mode=k.mode||"fixed";
+        Admin.fixedNum=k.fixedNum||6;
+        Admin.pattern=(k.pattern&&k.pattern.length)?k.pattern:[6];
+        Admin.everyN=k.everyN||3;
+        Admin.patternIdx=0;Admin.rollCount=0;
+        adminSave();setTurnUI();sndTap();
+      });
+      c.on("close",()=>{Remote.conn=null;remoteSetStatus("कंट्रोलर हटा");setTurnUI();});
+    });
+    Remote.peer.on("error",e=>{remoteSetStatus("एरर: "+((e&&e.type)||"नेटवर्क"));});
+  }catch(e){remoteSetStatus("होस्ट नहीं बना");}
+}
 
 /* ---------------- init ---------------- */
 drawDice(6);
