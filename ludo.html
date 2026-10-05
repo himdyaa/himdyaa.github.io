@@ -5,185 +5,344 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Ludo Game</title>
 <style>
-/* ============ CHUNK 1: BASE + ALL CSS ============ */
+/* ==========================================================================
+   LUDO — premium presentation layer (original artwork, no third-party assets)
+   Engine contract: every id/class referenced by the game JS is preserved.
+   ========================================================================== */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --bs:min(94vw,52vh);            /* board size: portrait friendly */
+  --bs:min(94vw,50vh);            /* board size: portrait friendly */
   --cell:calc(var(--bs)/15);
-  --red:#e53935; --green:#43a047; --yellow:#fdd835; --blue:#1e88e5;
-  --redD:#b71c1c; --greenD:#1b5e20; --yellowD:#f9a825; --blueD:#0d47a1;
-  --bg:#141428; --panel:#1f1f38; --txt:#f2f2f7; --dim:#a9a9c7;
+  --red:#e53935;   --green:#43a047; --yellow:#fdd835; --blue:#1e88e5;
+  --redD:#a31515;  --greenD:#1b5e20; --yellowD:#c8930a; --blueD:#0d47a1;
+  --gold:#ffd54f;  --goldD:#c79a1b;
+  --bg0:#0b0e1a; --bg1:#141a30;
+  --panel:#1b2138; --panel2:#232b4a;
+  --txt:#f4f6ff; --dim:#9aa3c0;
+  --line:rgba(255,255,255,.09);
 }
 html,body{height:100%}
 body{
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
-  background:radial-gradient(circle at 50% 0%,#26264a 0%,var(--bg) 60%);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari",sans-serif;
+  background:
+url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cg fill='%23ffffff' fill-opacity='0.055'%3E%3Crect x='20' y='20' width='46' height='46' rx='10'/%3E%3Crect x='84' y='84' width='46' height='46' rx='10'/%3E%3C/g%3E%3Cg fill='%23000000' fill-opacity='0.12'%3E%3Ccircle cx='34' cy='34' r='5'/%3E%3Ccircle cx='52' cy='34' r='5'/%3E%3Ccircle cx='34' cy='52' r='5'/%3E%3Ccircle cx='52' cy='52' r='5'/%3E%3Ccircle cx='98' cy='98' r='5'/%3E%3Ccircle cx='116' cy='116' r='5'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(130% 55% at 50% -8%, #2f6fe0 0%, transparent 60%),
+    radial-gradient(110% 45% at 50% 112%, #0a2a72 0%, transparent 60%),
+    linear-gradient(180deg,#1550b8 0%,#0d2c78 55%,#081c50 100%);
   color:var(--txt); overflow:hidden; user-select:none; -webkit-user-select:none;
   touch-action:manipulation;
 }
+/* ambient glow orbs (pure decoration) */
+body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(100px);
+  opacity:.32;z-index:0;pointer-events:none}
+body::before{width:360px;height:360px;background:#4d9fff;top:-110px;left:-110px;opacity:.18;
+  animation:drift 16s ease-in-out infinite alternate}
+body::after{width:320px;height:320px;background:#0a2a72;bottom:-100px;right:-100px;opacity:.25;
+  animation:drift 20s ease-in-out infinite alternate-reverse}
+@keyframes drift{to{transform:translate(70px,46px)}}
 button{font-family:inherit}
 
 /* ---------- screens ---------- */
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;z-index:10}
-#setupScreen{background:radial-gradient(circle at 50% 20%,#2c2c55 0%,var(--bg) 65%)}
-#gameScreen{justify-content:flex-start;padding:8px 8px 10px;display:none}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:16px;z-index:10;overflow-y:auto}
+#setupScreen{justify-content:center}
+#gameScreen{justify-content:flex-start;padding:10px 10px 12px;display:none}
 .hidden{display:none!important}
 
-/* ---------- setup ---------- */
-.logoRow{display:flex;gap:6px;margin-bottom:6px}
-.logoDie{width:13vmin;height:13vmin;max-width:64px;max-height:64px;border-radius:18%;
-  display:flex;align-items:center;justify-content:center;font-size:7vmin;font-weight:900;color:#fff;
-  box-shadow:0 4px 0 rgba(0,0,0,.35),0 8px 18px rgba(0,0,0,.4);transform:rotate(-8deg)}
-.logoDie:nth-child(2){transform:rotate(7deg)}
+/* ================= SETUP ================= */
+.logoRow{display:flex;gap:10px;margin-bottom:10px}
+.logoDie{width:60px;height:60px;border-radius:15px;display:grid;
+  grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:15%;
+  background:linear-gradient(145deg,#ffffff,#cfd6e8);
+  box-shadow:0 5px 0 rgba(0,0,0,.28),0 12px 26px rgba(0,0,0,.45),
+    inset 0 2px 3px rgba(255,255,255,.9)}
+.logoDie:nth-child(1){transform:rotate(-9deg)}
+.logoDie:nth-child(2){transform:rotate(6deg) translateY(-4px)}
 .logoDie:nth-child(3){transform:rotate(-4deg)}
-.logoDie:nth-child(4){transform:rotate(9deg)}
-#setupTitle{font-size:11vmin;font-weight:900;letter-spacing:6px;margin:4px 0 2px;cursor:pointer;
-  background:linear-gradient(180deg,#fff,#ffd54f);-webkit-background-clip:text;background-clip:text;color:transparent;
-  text-shadow:0 4px 18px rgba(255,213,79,.25)}
-.setupSub{color:var(--dim);margin-bottom:14px;font-size:4vmin}
-.setupCard{background:var(--panel);border:1px solid #34345e;border-radius:18px;padding:16px 18px;
-  width:min(92vw,420px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
-.setupCard h3{font-size:4.4vmin;margin-bottom:10px;color:#ffd54f}
-.colorRow{display:flex;gap:10px;justify-content:center;margin-bottom:16px}
-.colorBtn{width:15vmin;height:15vmin;max-width:68px;max-height:68px;border-radius:50%;border:4px solid transparent;
-  cursor:pointer;position:relative;box-shadow:inset -3px -6px 0 rgba(0,0,0,.25)}
-.colorBtn.sel{border-color:#fff;box-shadow:0 0 0 3px #ffd54f,inset -3px -6px 0 rgba(0,0,0,.25)}
-.colorBtn small{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:3.2vmin;color:var(--dim);white-space:nowrap}
-.oppRow{display:flex;gap:10px;justify-content:center;margin-bottom:6px}
-.oppBtn{flex:1;padding:10px 0;border-radius:12px;border:2px solid #34345e;background:#26264a;color:var(--txt);
-  font-size:4.6vmin;font-weight:700;cursor:pointer}
-.oppBtn.sel{background:#ffd54f;color:#222;border-color:#ffd54f}
-#startBtn{width:100%;margin-top:16px;padding:14px;border:none;border-radius:14px;font-size:5.4vmin;font-weight:900;
-  background:linear-gradient(180deg,#66bb6a,#2e7d32);color:#fff;cursor:pointer;
-  box-shadow:0 5px 0 #1b5e20,0 10px 24px rgba(0,0,0,.4)}
-#startBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #1b5e20}
-.setupNote{margin-top:12px;color:var(--dim);font-size:3.4vmin;text-align:center}
+.logoDie:nth-child(4){transform:rotate(10deg)}
+.logoDie i{border-radius:50%;place-self:center;width:78%;height:78%}
+.logoDie.dv1 i:nth-child(5),
+.logoDie.dv2 i:nth-child(1),.logoDie.dv2 i:nth-child(9),
+.logoDie.dv3 i:nth-child(1),.logoDie.dv3 i:nth-child(5),.logoDie.dv3 i:nth-child(9),
+.logoDie.dv4 i:nth-child(1),.logoDie.dv4 i:nth-child(3),.logoDie.dv4 i:nth-child(7),.logoDie.dv4 i:nth-child(9),
+.logoDie.dv5 i:nth-child(1),.logoDie.dv5 i:nth-child(3),.logoDie.dv5 i:nth-child(5),.logoDie.dv5 i:nth-child(7),.logoDie.dv5 i:nth-child(9),
+.logoDie.dv6 i:nth-child(1),.logoDie.dv6 i:nth-child(3),.logoDie.dv6 i:nth-child(4),
+.logoDie.dv6 i:nth-child(6),.logoDie.dv6 i:nth-child(7),.logoDie.dv6 i:nth-child(9){background:var(--dc,#333)}
+#setupTitle{font-size:15vmin;font-weight:900;letter-spacing:8px;margin:2px 0 4px;cursor:pointer;line-height:1;
+  text-shadow:0 4px 0 rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.5)}
+#setupTitle span{display:inline-block;animation:floaty 3.2s ease-in-out infinite}
+#setupTitle span:nth-child(2){animation-delay:.2s}
+#setupTitle span:nth-child(3){animation-delay:.4s}
+#setupTitle span:nth-child(4){animation-delay:.6s}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.setupSub{color:var(--dim);margin-bottom:16px;font-size:4vmin;letter-spacing:.5px}
+.strip{width:min(92vw,420px);text-align:center;font-size:4.6vmin;font-weight:900;letter-spacing:3px;
+  color:#5a3c00;padding:11px 10px;border-radius:14px;margin:14px 0 14px;
+  background:linear-gradient(180deg,#ffe9a8 0%,#ffd54f 45%,#f0a500 100%);
+  box-shadow:0 4px 0 #a86f00,0 10px 22px rgba(0,0,0,.45),inset 0 2px 3px rgba(255,255,255,.65);
+  text-shadow:0 1px 0 rgba(255,255,255,.5)}
+.modeRow{width:min(92vw,420px);display:flex;gap:12px;margin-bottom:6px}
+.modeBtn{flex:1;padding:20px 6px;border-radius:18px;cursor:pointer;color:#fff;
+  background:linear-gradient(180deg,#5ea9ec 0%,#2b7cd3 55%,#1a5aa0 100%);
+  border:2px solid rgba(255,255,255,.35);
+  box-shadow:0 6px 0 #0e3a68,0 14px 28px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.45);
+  transition:transform .12s,box-shadow .12s}
+.modeBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #0e3a68}
+.modeBtn .mi{font-size:8vmin;display:block;margin-bottom:6px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.4))}
+.modeBtn .mt{font-size:4.6vmin;font-weight:900;letter-spacing:1px;text-shadow:0 2px 3px rgba(0,0,0,.35)}
+.modeBtn .ms{font-size:3.2vmin;color:#dceaff;font-weight:600;margin-top:4px}
+.modeBtn.sel{outline:4px solid var(--gold);box-shadow:0 6px 0 #0e3a68,0 0 26px rgba(255,213,79,.75),inset 0 2px 4px rgba(255,255,255,.45)}
+#aiWrap{width:min(92vw,420px);margin-top:4px}
+.aiLabel{text-align:center;font-size:4vmin;font-weight:800;color:#ffe9a8;margin-bottom:10px;
+  text-shadow:0 2px 4px rgba(0,0,0,.5)}
+.colorRow{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+.colorBtn{width:15vmin;height:15vmin;max-width:66px;max-height:66px;border-radius:50%;
+  border:4px solid rgba(255,255,255,.14);cursor:pointer;position:relative;
+  box-shadow:inset -4px -8px 0 rgba(0,0,0,.28),inset 3px 5px 6px rgba(255,255,255,.35),
+    0 6px 16px rgba(0,0,0,.4);transition:transform .15s,border-color .15s,box-shadow .15s}
+.colorBtn:active{transform:scale(.93)}
+.colorBtn.sel{border-color:#fff;box-shadow:0 0 0 3px var(--gold),0 0 22px rgba(255,213,79,.55),
+  inset -4px -8px 0 rgba(0,0,0,.28),inset 3px 5px 6px rgba(255,255,255,.35)}
+.colorBtn small{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);
+  font-size:3.2vmin;color:var(--dim);white-space:nowrap;font-weight:700}
+.oppRow{display:flex;gap:10px;justify-content:center;margin-bottom:8px}
+.oppBtn{flex:1;padding:12px 0;border-radius:14px;border:1.5px solid var(--line);
+  background:rgba(255,255,255,.04);color:var(--txt);
+  font-size:4vmin;font-weight:800;cursor:pointer;transition:all .15s}
+.oppBtn:active{transform:scale(.96)}
+.oppBtn.sel{background:linear-gradient(180deg,var(--gold),#f0b429);color:#3a2c00;border-color:transparent;
+  box-shadow:0 4px 14px rgba(255,213,79,.4)}
+#startBtn{width:min(92vw,420px);margin-top:20px;padding:17px;border:none;border-radius:20px;
+  font-size:6vmin;font-weight:900;letter-spacing:2px;cursor:pointer;color:#fff;
+  background:linear-gradient(180deg,#ffb74d 0%,#fb8c00 55%,#ef6c00 100%);
+  box-shadow:0 7px 0 #a84e00,0 16px 34px rgba(0,0,0,.5),inset 0 2px 3px rgba(255,255,255,.55);
+  text-shadow:0 2px 4px rgba(0,0,0,.35)}
+#startBtn:active{transform:translateY(5px);box-shadow:0 2px 0 #a84e00}
+.setupNote{margin-top:14px;color:var(--dim);font-size:3.4vmin;text-align:center}
 
-/* ---------- game header / scoreboard ---------- */
-#topBar{width:100%;max-width:520px;display:flex;align-items:center;justify-content:space-between;padding:2px 4px 6px}
-#gameTitle{font-size:6vmin;font-weight:900;letter-spacing:4px;cursor:pointer;
-  background:linear-gradient(180deg,#fff,#ffd54f);-webkit-background-clip:text;background-clip:text;color:transparent}
-#newGameBtn{background:#33335c;color:var(--txt);border:1px solid #4a4a7a;border-radius:10px;padding:6px 12px;font-size:3.8vmin;cursor:pointer}
-#scoreRow{width:100%;max-width:520px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
-.pchip{border-radius:12px;padding:6px 4px;text-align:center;background:#23233f;border:2px solid transparent;position:relative;transition:border-color .25s,box-shadow .25s}
-.pchip .dot{display:inline-block;width:3.4vmin;height:3.4vmin;border-radius:50%;vertical-align:-2px;margin-right:4px;
-  box-shadow:inset -2px -3px 0 rgba(0,0,0,.25)}
-.pchip .nm{font-size:3.6vmin;font-weight:700}
-.pchip .fin{font-size:3vmin;color:var(--dim)}
-.pchip.active{border-color:#ffd54f;box-shadow:0 0 12px rgba(255,213,79,.55);animation:chipPulse 1.2s infinite}
-@keyframes chipPulse{0%,100%{box-shadow:0 0 6px rgba(255,213,79,.35)}50%{box-shadow:0 0 16px rgba(255,213,79,.8)}}
-.pchip .crown{position:absolute;top:-9px;right:4px;font-size:4vmin}
+/* ================= GAME HEADER ================= */
+#topBar{width:100%;max-width:460px;display:flex;align-items:center;justify-content:space-between;
+  padding:2px 6px 8px}
+#gameTitle{font-size:6.4vmin;font-weight:900;letter-spacing:5px;cursor:pointer;line-height:1;
+  background:linear-gradient(180deg,#fff 20%,var(--gold) 90%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+#newGameBtn{background:rgba(255,255,255,.06);color:var(--txt);border:1px solid var(--line);
+  border-radius:12px;padding:8px 14px;font-size:3.8vmin;font-weight:700;cursor:pointer}
+#newGameBtn:active{transform:scale(.95)}
 
-/* ---------- board ---------- */
-#boardWrap{position:relative;width:var(--bs);height:var(--bs);flex:0 0 auto}
+/* ================= PLAYER PANELS (2x2 corners) ================= */
+#scoreRow{width:100%;max-width:460px;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.pchip{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:16px;position:relative;
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+  border:1.5px solid var(--line);transition:border-color .25s,box-shadow .25s,background .25s;
+  box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06)}
+.pchip .dot{width:40px;height:40px;flex:0 0 auto;border-radius:50%;
+  box-shadow:inset -4px -6px 0 rgba(0,0,0,.28),inset 3px 4px 5px rgba(255,255,255,.35),
+    0 0 0 3px rgba(255,255,255,.14),0 4px 10px rgba(0,0,0,.4)}
+.pchip .nm{font-size:3.9vmin;font-weight:800;line-height:1.15}
+.pchip .fin{margin-left:auto;font-size:3vmin;color:var(--dim);font-weight:700;white-space:nowrap;
+  background:rgba(0,0,0,.35);padding:5px 9px;border-radius:20px;border:1px solid var(--line)}
+.pchip .fin b{color:var(--gold)}
+.pchip.active{border-color:var(--gold);background:linear-gradient(165deg,rgba(255,213,79,.14),rgba(255,213,79,.03));
+  box-shadow:0 0 16px rgba(255,213,79,.5),0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);
+  animation:chipPulse 1.4s ease-in-out infinite}
+.pchip.active .dot{animation:avatarPulse 1.4s ease-in-out infinite}
+@keyframes chipPulse{0%,100%{box-shadow:0 0 8px rgba(255,213,79,.35),0 4px 14px rgba(0,0,0,.35)}
+  50%{box-shadow:0 0 22px rgba(255,213,79,.75),0 4px 14px rgba(0,0,0,.35)}}
+@keyframes avatarPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.pchip .crown{position:absolute;top:-11px;right:8px;font-size:4.4vmin;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));
+  animation:floaty 2.4s ease-in-out infinite}
+
+/* ================= BOARD ================= */
+#boardWrap{position:relative;width:var(--bs);height:var(--bs);flex:0 0 auto;
+  filter:drop-shadow(0 18px 40px rgba(0,0,0,.6))}
 #board{position:absolute;inset:0;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);
-  background:#0d0d1c;border-radius:8px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.55),0 0 0 3px #34345e}
-.cell{background:#fdfdfd;border:.5px solid #c9c9d6;position:relative;display:flex;align-items:center;justify-content:center;
+  background:#10142a;border-radius:14px;overflow:hidden;
+  box-shadow:0 0 0 3px #3a4270,0 0 26px rgba(90,110,255,.22),inset 0 0 40px rgba(0,0,0,.35)}
+.cell{background:#f5f7fd;border:1px solid #d9deee;position:relative;display:flex;align-items:center;justify-content:center;
   font-size:calc(var(--cell)*.52);color:#555;line-height:1}
-.cell.baseR{background:var(--red)} .cell.baseG{background:var(--green)}
-.cell.baseY{background:var(--yellow)} .cell.baseB{background:var(--blue)}
-.cell.hR{background:#ffcdd2} .cell.hG{background:#c8e6c9} .cell.hY{background:#fff9c4} .cell.hB{background:#bbdefb}
-.cell.sR{background:var(--red)} .cell.sG{background:var(--green)} .cell.sY{background:var(--yellow)} .cell.sB{background:var(--blue)}
-.cell.star{color:#e65100;font-size:calc(var(--cell)*.55)}
-.cell.sR,.cell.sG,.cell.sY,.cell.sB{color:#fff;font-size:calc(var(--cell)*.55)}
-/* home-base white boxes + center triangles (absolute overlays) */
-.baseBox{position:absolute;background:#fdfdfd;border-radius:12%;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);
+/* home stretches — soft glossy tints */
+.cell.hR{background:linear-gradient(160deg,#ffd9d9,#f5b5b5)}
+.cell.hG{background:linear-gradient(160deg,#cdefd2,#a9dcae)}
+.cell.hY{background:linear-gradient(160deg,#fff3bf,#f7e38b)}
+.cell.hB{background:linear-gradient(160deg,#c4e0fb,#9cc4f5)}
+/* start squares — solid + white direction arrow (emoji hidden) */
+.cell.sR{background:radial-gradient(circle at 35% 30%,#f06666,var(--red))}
+.cell.sG{background:radial-gradient(circle at 35% 30%,#63bd71,var(--green))}
+.cell.sY{background:radial-gradient(circle at 35% 30%,#ffe066,var(--yellowD))}
+.cell.sB{background:radial-gradient(circle at 35% 30%,#4a9df0,var(--blue))}
+.cell.sR,.cell.sG,.cell.sY,.cell.sB{font-size:0;color:transparent}
+.cell.sR::after,.cell.sG::after,.cell.sY::after,.cell.sB::after{
+  content:"➤";font-size:calc(var(--cell)*.62);color:#fff;display:block;
+  text-shadow:0 2px 3px rgba(0,0,0,.45)}
+.cell.sG::after{transform:rotate(90deg)}
+.cell.sY::after{transform:rotate(180deg)}
+.cell.sB::after{transform:rotate(270deg)}
+/* safe stars */
+.cell.star{background:linear-gradient(160deg,#fff8e1,#ffecb3);color:#e65100;font-size:calc(var(--cell)*.58);
+  text-shadow:0 1px 0 #fff}
+/* home-base corner blocks */
+.cell.baseR{background:radial-gradient(circle at 35% 30%,#f06666,var(--redD))}
+.cell.baseG{background:radial-gradient(circle at 35% 30%,#63bd71,var(--greenD))}
+.cell.baseY{background:radial-gradient(circle at 35% 30%,#ffe066,var(--yellowD))}
+.cell.baseB{background:radial-gradient(circle at 35% 30%,#4a9df0,var(--blueD))}
+/* white inner boxes on home bases */
+.baseBox{position:absolute;background:linear-gradient(165deg,#ffffff,#e8ecf7);border-radius:14%;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.14),0 3px 10px rgba(0,0,0,.3);
   display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;place-items:center;padding:6%}
-.spot{width:52%;height:52%;border-radius:50%;box-shadow:inset -2px -4px 0 rgba(0,0,0,.22)}
-#centerBox{position:absolute;left:40%;top:40%;width:20%;height:20%;background:#fdfdfd}
+.spot{width:54%;height:54%;border-radius:50%;
+  box-shadow:inset -3px -5px 0 rgba(0,0,0,.28),inset 2px 3px 4px rgba(255,255,255,.4),0 2px 5px rgba(0,0,0,.3)}
+/* center home triangles */
+#centerBox{position:absolute;left:40%;top:40%;width:20%;height:20%;background:#f5f7fd;
+  box-shadow:inset 0 0 12px rgba(0,0,0,.2);border-radius:6px;overflow:hidden}
 .tri{position:absolute;inset:0}
-.triR{background:var(--red);clip-path:polygon(0 0,100% 50%,0 100%)}
-.triG{background:var(--green);clip-path:polygon(0 0,100% 0,50% 100%)}
-.triY{background:var(--yellow);clip-path:polygon(100% 0,100% 100%,0 50%)}
-.triB{background:var(--blue);clip-path:polygon(0 100%,100% 100%,50% 0)}
+.triR{background:linear-gradient(135deg,#f06666,var(--redD));clip-path:polygon(0 0,100% 50%,0 100%)}
+.triG{background:linear-gradient(135deg,#63bd71,var(--greenD));clip-path:polygon(0 0,100% 0,50% 100%)}
+.triY{background:linear-gradient(135deg,#ffe066,var(--yellowD));clip-path:polygon(100% 0,100% 100%,0 50%)}
+.triB{background:linear-gradient(135deg,#4a9df0,var(--blueD));clip-path:polygon(0 100%,100% 100%,50% 0)}
+
 /* token layer */
 #tokLayer{position:absolute;inset:0;pointer-events:none;z-index:5}
 .token{position:absolute;width:6.4%;aspect-ratio:1;border-radius:50%;pointer-events:auto;cursor:pointer;
-  transform:translate(-50%,-50%);transition:left .18s ease,top .18s ease;
-  box-shadow:0 3px 6px rgba(0,0,0,.45),inset -2px -4px 0 rgba(0,0,0,.28),inset 2px 3px 0 rgba(255,255,255,.35);
+  transform:translate(-50%,-50%);transition:left .18s ease,top .18s ease,width .18s ease;
+  box-shadow:0 4px 8px rgba(0,0,0,.5),inset -2px -4px 0 rgba(0,0,0,.28),inset 2px 3px 4px rgba(255,255,255,.4);
   display:flex;align-items:center;justify-content:center}
-.token::after{content:"";width:38%;height:38%;border-radius:50%;background:rgba(255,255,255,.85)}
-.token.movable{animation:tokGlow .7s infinite;cursor:pointer;z-index:9}
-@keyframes tokGlow{0%,100%{filter:drop-shadow(0 0 2px #fff)}50%{filter:drop-shadow(0 0 9px #fff) brightness(1.25)}}
-.token.done{opacity:.92}
+.token::after{content:"";width:36%;height:36%;border-radius:50%;background:rgba(255,255,255,.9);
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.15)}
+.token.movable{animation:tokGlow .7s ease-in-out infinite;cursor:pointer;z-index:9}
+@keyframes tokGlow{0%,100%{filter:drop-shadow(0 0 2px #fff)}50%{filter:drop-shadow(0 0 10px #fff) brightness(1.3)}}
+.token.done{opacity:.94}
+.token.hop{animation:tokHop .17s ease}
+@keyframes tokHop{0%{margin-top:0}45%{margin-top:-10px}100%{margin-top:0}}
+#boardWrap.shake{animation:bshake .42s}
+@keyframes bshake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,4px)}
+  40%{transform:translate(6px,-5px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(3px,2px)}}
 
-/* ---------- dice + message ---------- */
-#midRow{width:100%;max-width:520px;display:flex;align-items:center;gap:10px;margin-top:8px}
+/* ================= DICE TRAY ================= */
+#midRow{width:100%;max-width:460px;display:flex;align-items:stretch;gap:10px;margin-top:10px}
+#diceTray{flex:1;display:flex;align-items:center;gap:12px;
+  background:linear-gradient(165deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);border-radius:18px;padding:10px 12px;
+  box-shadow:0 10px 26px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.07)}
 #diceWrap{position:relative;flex:0 0 auto}
-#dice{width:17vmin;height:17vmin;max-width:84px;max-height:84px;background:linear-gradient(145deg,#fff,#dfe3ee);
-  border-radius:20%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-  padding:12%;box-shadow:0 6px 0 #aab,0 10px 22px rgba(0,0,0,.5);cursor:pointer;position:relative}
-#dice.rolling{animation:diceShake .12s infinite}
-@keyframes diceShake{0%{transform:rotate(-8deg) scale(1.05)}50%{transform:rotate(8deg) scale(.95)}100%{transform:rotate(-8deg) scale(1.05)}}
-#dice.dim{opacity:.45;cursor:default}
-.pip{width:70%;height:70%;border-radius:50%;background:#22263a;place-self:center;visibility:hidden}
+#dice{width:76px;height:76px;background:linear-gradient(145deg,#ffffff,#ccd3e6);
+  border-radius:18px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+  padding:13%;cursor:pointer;position:relative;
+  box-shadow:0 6px 0 #9aa3bd,0 12px 24px rgba(0,0,0,.5),inset 0 2px 3px rgba(255,255,255,.95)}
+#dice:active{transform:translateY(3px)}
+#dice.rolling{animation:diceShake .13s linear infinite}
+@keyframes diceShake{
+  0%{transform:rotate(-10deg) scale(1.06) translateY(-3px)}
+  50%{transform:rotate(9deg) scale(.94) translateY(2px)}
+  100%{transform:rotate(-10deg) scale(1.06) translateY(-3px)}}
+#dice::before{content:"";position:absolute;inset:7px;border-radius:13px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.5),transparent 46%)}
+#dice.dim{opacity:.4;cursor:default;filter:grayscale(.5)}
+#dice.dim:active{transform:none}
+.pip{width:72%;height:72%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a4066,#181c33);
+  place-self:center;visibility:hidden;box-shadow:inset 0 2px 3px rgba(0,0,0,.6)}
 .pip.on{visibility:visible}
-#lucky{position:absolute;top:-10px;right:-8px;font-size:5vmin;display:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-#turnInfo{flex:1;background:var(--panel);border:1px solid #34345e;border-radius:14px;padding:8px 12px;min-height:17vmin}
-#turnLabel{font-size:4.4vmin;font-weight:800}
-#msg{font-size:3.8vmin;color:var(--dim);margin-top:2px;min-height:5vmin}
+#lucky{position:absolute;top:-12px;right:-10px;font-size:5.4vmin;display:none;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));animation:floaty 2s ease-in-out infinite}
+#turnInfo{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+#turnLabel{font-size:4.6vmin;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#msg{font-size:3.7vmin;color:var(--dim);margin-top:4px;min-height:5vmin;line-height:1.35}
 
-/* ---------- win overlay ---------- */
-.overlay{position:fixed;inset:0;background:rgba(8,8,20,.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
-#winBox{background:var(--panel);border:2px solid #ffd54f;border-radius:22px;padding:26px 30px;text-align:center;
-  box-shadow:0 0 60px rgba(255,213,79,.35);animation:winPop .45s cubic-bezier(.2,1.6,.4,1)}
+/* ================= WIN OVERLAY ================= */
+.overlay{position:fixed;inset:0;background:rgba(6,8,18,.84);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+#winBox{background:linear-gradient(165deg,#2a3260,#171b36);border:2px solid var(--gold);border-radius:26px;
+  padding:30px 34px;text-align:center;position:relative;overflow:hidden;
+  box-shadow:0 0 70px rgba(255,213,79,.35),0 24px 60px rgba(0,0,0,.6);
+  animation:winPop .5s cubic-bezier(.2,1.6,.4,1)}
+#winBox::before{content:"";position:absolute;inset:-60%;pointer-events:none;
+  background:conic-gradient(from 0deg,transparent 0 40deg,rgba(255,213,79,.14) 60deg,transparent 90deg,
+    transparent 180deg,rgba(255,213,79,.14) 220deg,transparent 250deg);
+  animation:spinSlow 7s linear infinite}
+@keyframes spinSlow{to{transform:rotate(360deg)}}
 @keyframes winPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
-#winBox .trophy{font-size:16vmin}
-#winTitle{font-size:7vmin;font-weight:900;color:#ffd54f;margin:6px 0}
-#winSub{color:var(--dim);font-size:4.2vmin;margin-bottom:14px}
-.bigBtn{padding:13px 34px;border:none;border-radius:14px;font-size:5vmin;font-weight:900;cursor:pointer;
-  background:linear-gradient(180deg,#66bb6a,#2e7d32);color:#fff;box-shadow:0 5px 0 #1b5e20}
-.bigBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #1b5e20}
+#winBox .trophy{font-size:15vmin;filter:drop-shadow(0 6px 14px rgba(255,213,79,.5));
+  animation:floaty 2.6s ease-in-out infinite;position:relative}
+#winTitle{font-size:7.4vmin;font-weight:900;margin:8px 0 4px;position:relative;
+  background:linear-gradient(180deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+#winSub{color:var(--dim);font-size:4.2vmin;margin-bottom:18px;position:relative}
+.bigBtn{padding:14px 36px;border:none;border-radius:16px;font-size:5vmin;font-weight:900;cursor:pointer;
+  background:linear-gradient(180deg,#5fd068,#2c8a3c);color:#fff;position:relative;
+  box-shadow:0 6px 0 #1c5e26,0 12px 26px rgba(0,0,0,.45),inset 0 2px 2px rgba(255,255,255,.35);
+  text-shadow:0 2px 3px rgba(0,0,0,.3)}
+.bigBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #1c5e26}
 
-/* ---------- admin modal ---------- */
-#adminModal .mbox{background:var(--panel);border:2px solid #7e57c2;border-radius:18px;padding:18px;width:min(92vw,400px);
-  max-height:86vh;overflow-y:auto;box-shadow:0 0 50px rgba(126,87,194,.4)}
-#adminModal h2{font-size:5.4vmin;color:#ce93d8;margin-bottom:2px}
+/* ================= ADMIN MODAL ================= */
+#adminModal .mbox{background:linear-gradient(165deg,#2b2350,#1a1633);border:1.5px solid #8f6fd8;
+  border-radius:22px;padding:20px;width:min(92vw,400px);max-height:86vh;overflow-y:auto;
+  box-shadow:0 0 60px rgba(126,87,194,.45),0 24px 60px rgba(0,0,0,.6);position:relative}
+#adminModal h2{font-size:5.6vmin;color:#d3b8ff;margin-bottom:2px;letter-spacing:.5px}
 #adminModal .asub{font-size:3.6vmin;color:var(--dim);margin-bottom:12px}
-.arow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px solid #33335c}
-.arow label{font-size:4.2vmin;font-weight:700}
-.atoggle{width:64px;height:34px;border-radius:20px;background:#444;position:relative;cursor:pointer;flex:0 0 auto;transition:background .2s}
-.atoggle.on{background:#66bb6a}
-.atoggle::after{content:"";position:absolute;top:4px;left:5px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s}
+.arow{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
+.arow label{font-size:4.4vmin;font-weight:800}
+.atoggle{width:66px;height:36px;border-radius:20px;background:#3c3c58;position:relative;cursor:pointer;
+  flex:0 0 auto;transition:background .2s;box-shadow:inset 0 2px 5px rgba(0,0,0,.4)}
+.atoggle.on{background:linear-gradient(180deg,#5fd068,#2c8a3c);box-shadow:0 0 12px rgba(95,208,104,.5)}
+.atoggle::after{content:"";position:absolute;top:4px;left:5px;width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(145deg,#fff,#cfd6e8);transition:left .2s;box-shadow:0 2px 5px rgba(0,0,0,.4)}
 .atoggle.on::after{left:33px}
-.abody{padding:10px 2px}
-.abody .fld{margin-bottom:12px}
-.abody .fld>span{display:block;font-size:3.8vmin;color:var(--dim);margin-bottom:6px}
+.abody{padding:12px 2px}
+.abody .fld{margin-bottom:14px}
+.abody .fld>span{display:block;font-size:3.8vmin;color:#c9aef2;margin-bottom:8px;font-weight:700}
 .segRow{display:flex;gap:8px;flex-wrap:wrap}
-.seg{flex:1;min-width:60px;padding:9px 4px;border-radius:10px;border:2px solid #3a3a62;background:#26264a;color:var(--txt);
-  font-size:4.2vmin;font-weight:700;cursor:pointer;text-align:center}
-.seg.sel{background:#7e57c2;border-color:#b39ddb}
+.seg{flex:1;min-width:60px;padding:10px 4px;border-radius:12px;border:1.5px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);color:var(--txt);
+  font-size:4.2vmin;font-weight:800;cursor:pointer;text-align:center;transition:all .15s}
+.seg:active{transform:scale(.95)}
+.seg.sel{background:linear-gradient(180deg,#9a72e8,#6f42c1);border-color:#c4a8f5;color:#fff;
+  box-shadow:0 0 12px rgba(154,114,232,.5)}
 .numRow{display:flex;gap:8px}
 .numRow .seg{min-width:0}
-#patInput{width:100%;padding:10px;border-radius:10px;border:2px solid #3a3a62;background:#26264a;color:var(--txt);font-size:4.6vmin;text-align:center;letter-spacing:2px}
+#patInput{width:100%;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.14);
+  background:rgba(0,0,0,.3);color:var(--txt);font-size:4.6vmin;text-align:center;letter-spacing:2px;font-weight:800}
 .abtns{display:flex;gap:10px;margin-top:14px}
-.abtns button{flex:1;padding:12px;border:none;border-radius:12px;font-size:4.6vmin;font-weight:800;cursor:pointer}
-#adminSave{background:linear-gradient(180deg,#66bb6a,#2e7d32);color:#fff}
-#adminReset{background:#4a4a6a;color:var(--txt)}
-#adminClose{position:absolute;top:8px;right:12px;background:none;border:none;color:var(--dim);font-size:6vmin;cursor:pointer}
-.awarn{font-size:3.4vmin;color:#ce93d8;margin-top:10px;text-align:center}
+.abtns button{flex:1;padding:13px;border:none;border-radius:14px;font-size:4.6vmin;font-weight:900;cursor:pointer}
+#adminSave{background:linear-gradient(180deg,#5fd068,#2c8a3c);color:#fff;
+  box-shadow:0 4px 0 #1c5e26;text-shadow:0 2px 3px rgba(0,0,0,.3)}
+#adminSave:active{transform:translateY(3px);box-shadow:0 1px 0 #1c5e26}
+#adminReset{background:rgba(255,255,255,.08);color:var(--txt);border:1px solid var(--line)}
+#adminReset:active{transform:scale(.97)}
+#adminClose{position:absolute;top:10px;right:14px;background:rgba(255,255,255,.07);border:none;color:var(--dim);
+  font-size:5vmin;cursor:pointer;width:40px;height:40px;border-radius:50%;line-height:1}
+.awarn{font-size:3.4vmin;color:#c9aef2;margin-top:12px;text-align:center;line-height:1.5}
+/* remote inputs */
+.abody input[type=text],.abody input[type=password]{width:100%;padding:12px;border-radius:12px;
+  border:1.5px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:var(--txt);
+  font-size:4.4vmin;font-weight:700}
+#remoteCodeBig{text-shadow:0 0 18px rgba(206,147,216,.6)}
 @media (max-height:620px){:root{--bs:min(94vw,44vh)}}
+
 </style>
 </head>
+<body>
 <body>
 
 <!-- ================= SETUP SCREEN ================= -->
 <div id="setupScreen" class="screen">
   <div class="logoRow">
-    <div class="logoDie" style="background:var(--red)">&#9873;</div>
-    <div class="logoDie" style="background:var(--green)">&#9873;</div>
-    <div class="logoDie" style="background:var(--yellow);color:#333">&#9873;</div>
-    <div class="logoDie" style="background:var(--blue)">&#9873;</div>
+    <div class="logoDie dv6" style="--dc:#e53935"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="logoDie dv3" style="--dc:#43a047"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="logoDie dv5" style="--dc:#c8930a"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="logoDie dv2" style="--dc:#1e88e5"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </div>
-  <h1 id="setupTitle" class="adminTrigger">LUDO</h1>
-  <div class="setupSub">&#127922; क्लासिक लूडो &mdash; दोस्तों (AI) के साथ खेलो</div>
-  <div class="setupCard">
-    <h3>&#127919; अपना रंग चुनो</h3>
-    <div class="colorRow" id="colorRow"></div>
-    <h3>&#129302; विरोधी (AI) कितने?</h3>
+  <h1 id="setupTitle" class="adminTrigger"><span style="color:#e53935">L</span><span style="color:#43a047">U</span><span style="color:#fdd835">D</span><span style="color:#1e88e5">O</span></h1>
+  <div class="setupSub">&#127922; क्लासिक लूडो &mdash; दोस्तों के साथ खेलो</div>
+  <div class="strip">&#127919; SELECT TOKEN</div>
+  <div class="colorRow" id="colorRow"></div>
+  <div class="strip">&#127918; SELECT GAME</div>
+  <div class="modeRow" id="modeRow"></div>
+  <div id="aiWrap">
+    <div class="aiLabel">&#129302; AI विरोधी कितने?</div>
     <div class="oppRow" id="oppRow"></div>
-    <button id="startBtn">&#9654; खेल शुरू करो</button>
   </div>
+  <button id="startBtn">Next &#9654;</button>
   <div class="setupNote">पूरी तरह ऑफ़लाइन &bull; कोई विज्ञापन नहीं &bull; क्लासिक नियम</div>
 </div>
 
@@ -200,13 +359,15 @@ button{font-family:inherit}
     <div id="tokLayer"></div>
   </div>
   <div id="midRow">
-    <div id="diceWrap">
-      <div id="dice"></div>
-      <div id="lucky">&#127808;</div>
-    </div>
-    <div id="turnInfo">
-      <div id="turnLabel">...</div>
-      <div id="msg">...</div>
+    <div id="diceTray">
+      <div id="diceWrap">
+        <div id="dice"></div>
+        <div id="lucky">&#127808;</div>
+      </div>
+      <div id="turnInfo">
+        <div id="turnLabel">...</div>
+        <div id="msg">...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -223,7 +384,7 @@ button{font-family:inherit}
 
 <!-- ================= ADMIN MODAL ================= -->
 <div id="adminModal" class="overlay hidden">
-  <div class="mbox" style="position:relative">
+  <div class="mbox">
     <button id="adminClose">&times;</button>
     <h2>&#128737; एडमिन पैनल</h2>
     <div class="asub">गुप्त सेटिंग &mdash; सिर्फ आपको दिखेगी</div>
@@ -252,20 +413,23 @@ button{font-family:inherit}
       <button id="adminSave">&#10003; सेव करो</button>
       <button id="adminReset">&#8635; रीसेट</button>
     </div>
-    <div class="fld" style="border-top:1px solid #5c4a72;margin-top:12px;padding-top:12px">
+    <div class="fld" style="border-top:1px solid rgba(255,255,255,.1);margin-top:12px;padding-top:12px">
       <span>&#128225; रिमोट कंट्रोल — दूसरे फोन (iPhone) से</span>
       <div class="fld"><span>Device ka naam</span>
-        <input id="remoteDevice" maxlength="24" placeholder="My Android" style="width:100%">
+        <input id="remoteDevice" type="text" maxlength="24" placeholder="My Android">
       </div>
       <div class="fld"><span>Owner username</span>
-        <input id="remoteOwner" maxlength="24" placeholder="himanshu" style="width:100%">
+        <input id="remoteOwner" type="text" maxlength="24" placeholder="himanshu">
+      </div>
+      <div class="fld"><span>Password (admin ko yahi dalna hoga)</span>
+        <input id="remotePass" type="password" maxlength="24" placeholder="••••">
       </div>
       <div style="margin-top:10px">
         <button id="remoteHost" class="seg" style="font-size:4.4vmin;padding:10px 18px">&#128225; होस्ट करो — नया कोड बनाओ</button>
       </div>
       <div id="remoteCodeBig" style="font-size:11vmin;font-weight:900;color:#ce93d8;letter-spacing:6px;text-align:center;margin:10px 0;min-height:12vmin"></div>
       <div id="remoteStatus" style="font-size:3.6vmin;color:var(--dim);margin-top:6px"></div>
-      <div style="font-size:3.2vmin;color:var(--dim)">iPhone par ludo-admin.html kholo, username + yahi code dalo. Har host par naya code, sheet me entry banegi.</div>
+      <div style="font-size:3.2vmin;color:var(--dim)">iPhone par ludo-admin.html kholo, username + password + yahi code dalo. Har host par naya code, sheet me entry banegi.</div>
     </div>
     <div class="awarn">बंद रखने पर पासा 100% निष्पक्ष &mdash; किसी को पता नहीं चलेगा</div>
   </div>
@@ -359,7 +523,7 @@ function tokenXY(color,i){
 }
 
 /* ---------------- setup screen ---------------- */
-let setupColor="blue", setupOpp=3;
+let setupColor="blue", setupMode="passnplay", setupAI=3;
 function buildSetup(){
   const cr=$("colorRow");cr.innerHTML="";
   ORDER.forEach(c=>{
@@ -372,16 +536,26 @@ function buildSetup(){
       b.classList.add("sel");sndTap();};
     cr.appendChild(b);
   });
+  const mr=$("modeRow");mr.innerHTML="";
+  [["computer","\uD83D\uDDA5\uFE0F","COMPUTER","vs AI खेलो"],
+   ["passnplay","\uD83D\uDC65","PASS N PLAY","4 human, ek phone"]].forEach(([v,ic,t,s])=>{
+    const b=document.createElement("button");
+    b.className="modeBtn"+(v===setupMode?" sel":"");
+    b.innerHTML='<span class="mi">'+ic+'</span><span class="mt">'+t+'</span><span class="ms">'+s+'</span>';
+    b.onclick=()=>{setupMode=v;sndTap();buildSetup();};
+    mr.appendChild(b);
+  });
   const or=$("oppRow");or.innerHTML="";
   [1,2,3].forEach(n=>{
     const b=document.createElement("button");
-    b.className="oppBtn"+(n===setupOpp?" sel":"");
+    b.className="oppBtn"+(n===setupAI?" sel":"");
     b.textContent=n+(n===1?" विरोधी":" विरोधी");
-    b.onclick=()=>{setupOpp=n;
+    b.onclick=()=>{setupAI=n;
       or.querySelectorAll(".oppBtn").forEach(x=>x.classList.remove("sel"));
       b.classList.add("sel");sndTap();};
     or.appendChild(b);
   });
+  $("aiWrap").style.display=setupMode==="computer"?"block":"none";
   $("startBtn").onclick=()=>{sndTap();startGame();};
   $("newGameBtn").onclick=()=>{sndTap();toSetup();};
   $("againBtn").onclick=()=>{sndTap();toSetup();};
@@ -418,7 +592,7 @@ function buildBoard(){
     const d=document.createElement("div");
     d.className="cell";d.dataset.k=k;
     const t=type[k],c=tcol[k];
-    if(t===1)d.style.background="#fdfdfd";
+    if(t===1){/* plain track: background via CSS (.cell) */}
     else if(t===2)d.className="cell "+({red:"hR",green:"hG",yellow:"hY",blue:"hB"}[c]);
     else if(t===3)d.className="cell "+({red:"sR",green:"sG",yellow:"sY",blue:"sB"}[c]),
       d.innerHTML="&#9873;";
@@ -447,7 +621,9 @@ function startGame(){
   G.humanColor=setupColor;
   const order=[setupColor];
   ORDER.forEach(c=>{if(c!==setupColor)order.push(c);});
-  G.players=order.slice(0,1+setupOpp).map(c=>({color:c,isAI:c!==setupColor,finished:0}));
+  const isPass=setupMode==="passnplay";
+  const totalP=isPass?4:1+setupAI;
+  G.players=order.slice(0,totalP).map(c=>({color:c,isAI:!isPass&&c!==setupColor,finished:0}));
   G.tokens={};G.players.forEach(p=>G.tokens[p.color]=[0,0,0,0]);
   G.turn=0;G.sixes=0;G.over=false;G.busy=false;G.rolling=false;G.awaitingMove=false;
   Admin.patternIdx=0;Admin.rollCount=0;
@@ -458,7 +634,7 @@ function startGame(){
   msg("&#127922; "+nameOf(cur())+" — पासा दबाओ!");
   sndStart();
 }
-function nameOf(p){return p.isAI?("AI "+COLORS[p.color].name):("तुम ("+COLORS[p.color].name+")");}
+function nameOf(p){if(p.isAI)return "AI "+COLORS[p.color].name;const i=G.players.indexOf(p);return "Khiladi "+(i+1)+" ("+COLORS[p.color].name+")";}
 
 /* ---------------- scoreboard + turn UI ---------------- */
 function buildScore(){
@@ -487,7 +663,7 @@ function setTurnUI(){
   });
   const p=cur();
   $("turnLabel").innerHTML='<span style="color:'+COLORS[p.color].css+'">&#9679;</span> '+
-    (p.isAI?"AI "+COLORS[p.color].name+" की चाल":"तुम्हारी चाल ("+COLORS[p.color].name+")");
+    (p.isAI?"AI "+COLORS[p.color].name+" की चाल":nameOf(p)+" की चाल");
   $("dice").classList.toggle("dim",!( !p.isAI&&!G.rolling&&!G.awaitingMove&&!G.busy&&!G.over));
   /* lucky clover when rigging is active for the current roller */
   const rigOn=Admin.enabled&&p.color===Admin.target;
@@ -634,7 +810,10 @@ function animateMove(m,done){
     G.tokens[m.c][m.i]++;
     const pp=G.tokens[m.c][m.i];
     sndStep(pp>=HOME_START);
-    renderTokens();s++;
+    renderTokens();
+    const _hopEl=document.querySelector('.token[data-c="'+m.c+'"][data-i="'+m.i+'"]');
+    if(_hopEl){_hopEl.classList.remove("hop");void _hopEl.offsetWidth;_hopEl.classList.add("hop");}
+    s++;
     setTimeout(hop,pp>=HOME_START?260:170);
   };
   hop();
@@ -656,7 +835,11 @@ function afterMove(m){
           }
         }
       });
-      if(note){extra=true;sndCapture();}else sndLand();
+      if(note){extra=true;sndCapture();
+        const _bw=$("boardWrap");
+        if(_bw){_bw.classList.remove("shake");void _bw.offsetWidth;_bw.classList.add("shake");
+          setTimeout(()=>_bw.classList.remove("shake"),460);}
+      }else sndLand();
     }else{sndLand();}
   }else if(to>=HOME_START&&to<FINISHED){sndLand();}
   /* finished a token */
@@ -778,7 +961,7 @@ function winGame(p){
   G.over=true;G.awaitingMove=false;G.movable=[];
   sndWin();renderTokens();setTurnUI();
   const isHuman=!p.isAI;
-  $("winTitle").textContent=isHuman?"🎉 तुम जीते!":"AI "+COLORS[p.color].name+" जीता";
+  $("winTitle").textContent=isHuman?("🎉 "+nameOf(p)+" जीते!"):"AI "+COLORS[p.color].name+" जीता";
   $("winSub").innerHTML=isHuman?
     "चारों गोटियां घर! शानदार खेल 👏":
     "AI "+COLORS[p.color].name+" ने चारों गोटियां घर पहुंचा दीं। फिर कोशिश करो!";
@@ -837,6 +1020,7 @@ function openAdmin(){
   try{
     const d=localStorage.getItem("ludo_remote_dev");if(d)$("remoteDevice").value=d;
     const o=localStorage.getItem("ludo_remote_owner");if(o)$("remoteOwner").value=o;
+    const pw=localStorage.getItem("ludo_remote_pass");if(pw)$("remotePass").value=pw;
   }catch(e){}
   $("adminModal").classList.remove("hidden");
   sndTap();
@@ -868,7 +1052,7 @@ const SHEET_FORM_URL="__SHEET_FORM_URL__";
 const SHEET_E_CODE="__SHEET_E_CODE__";
 const SHEET_E_DEV="__SHEET_E_DEV__";
 const SHEET_E_OWNER="__SHEET_E_OWNER__";
-const Remote={peer:null,conn:null,code:null,owner:"himanshu",device:"My Android"};
+const Remote={peer:null,conn:null,code:null,owner:"himanshu",pass:"",device:"My Android"};
 function remoteSetStatus(t){const el=$("remoteStatus");if(el)el.textContent=t;}
 function genCode(){
   const ch="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -888,7 +1072,9 @@ function remoteHost(){
   const owner=(($("remoteOwner").value||"").trim()||"himanshu").slice(0,24);
   try{localStorage.setItem("ludo_remote_dev",dev);}catch(e){}
   try{localStorage.setItem("ludo_remote_owner",owner);}catch(e){}
-  Remote.device=dev;Remote.owner=owner;
+  const pass=(($("remotePass").value||"").trim()).slice(0,24);
+  try{localStorage.setItem("ludo_remote_pass",pass);}catch(e){}
+  Remote.device=dev;Remote.owner=owner;Remote.pass=pass;
   if(Remote.peer){try{Remote.peer.destroy();}catch(e){} Remote.peer=null;Remote.conn=null;}
   const code=genCode();
   Remote.code=code;
@@ -898,20 +1084,20 @@ function remoteHost(){
   if(typeof Peer==="undefined"){remoteSetStatus("Net nahi — code "+code+" phir bhi dikh raha hai");return;}
   try{
     Remote.peer=new Peer("himludo-g-"+code);
-    Remote.peer.on("open",()=>remoteSetStatus("✅ Taiyar — iPhone par username + code "+code+" dalo (sheet me entry ho gayi)"));
+    Remote.peer.on("open",()=>remoteSetStatus("✅ Taiyar — iPhone par username + password + code "+code+" dalo"));
     Remote.peer.on("connection",c=>{
       c.on("open",()=>{ c.send({t:"whoareyou"}); });
       c.on("data",d=>{
         if(!d||!d.t)return;
         if(d.t==="auth"){
-          if((d.user||"").trim()===Remote.owner){
+          if((d.user||"").trim()===Remote.owner&&(d.pass||"")===Remote.pass){
             Remote.conn=c;
             c.send({t:"auth-ok",device:Remote.device});
             remoteSetStatus("✅ Controller juda ("+Remote.device+") — iPhone se chalao");
             setTurnUI();sndTap();
           }else{
             c.send({t:"auth-no"});
-            remoteSetStatus("⚠️ Galat username se connect try hua");
+            remoteSetStatus("⚠️ Galat username/password se connect try hua");
             setTimeout(()=>{try{c.close();}catch(e){}},600);
           }
           return;
